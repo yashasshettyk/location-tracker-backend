@@ -18,7 +18,8 @@
     .eyebrow { color:#8bd4ca; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:9px; }
     header p { margin:6px 0 0; color:#aebbc0; }
     main { width:min(1180px, calc(100% - 32px)); margin:22px auto 44px; }
-    .toolbar { display:grid; grid-template-columns:minmax(180px, 1fr) minmax(180px, 260px) minmax(140px, 180px) auto auto auto; gap:10px; align-items:end; background:var(--white); border:1px solid var(--line); padding:16px; box-shadow:0 7px 20px rgba(23,33,43,.05); }
+    .toolbar { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; align-items:end; background:var(--white); border:1px solid var(--line); padding:16px; box-shadow:0 7px 20px rgba(23,33,43,.05); }
+    .toolbar button { width:100%; }
     .toolbar-title { grid-column:1 / -1; display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding-bottom:3px; }
     .toolbar-title strong { font:600 18px 'Space Grotesk',sans-serif; }
     .toolbar-title span { color:var(--muted); font-size:13px; }
