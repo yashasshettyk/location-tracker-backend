@@ -1,5 +1,6 @@
 const express = require('express');
 const { getSql } = require('../db');
+const { sendLocationRequest } = require('../firebase');
 
 const router = express.Router();
 
@@ -131,6 +132,23 @@ router.put('/:deviceId/settings', async (req, res) => {
   }
 });
 
+router.put('/:deviceId/fcm-token', async (req, res) => {
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  if (!token) return res.status(400).json({ error: 'token is required' });
+  try {
+    const sql = await getSql();
+    await sql.query(
+      `INSERT INTO device_settings (device_id, fcm_token, updated_at) VALUES ($1, $2, now())
+       ON CONFLICT (device_id) DO UPDATE SET fcm_token = EXCLUDED.fcm_token, updated_at = now()`,
+      [req.params.deviceId, token]
+    );
+    res.status(204).send();
+  } catch (err) {
+    console.error('[PUT FCM token ERROR]', err);
+    res.status(500).json({ error: 'Failed to register device notifications' });
+  }
+});
+
 router.post('/:deviceId/location-request', async (req, res) => {
   try {
     const sql = await getSql();
@@ -138,9 +156,11 @@ router.post('/:deviceId/location-request', async (req, res) => {
       `INSERT INTO device_settings (device_id, location_request_at, updated_at)
        VALUES ($1, now(), now())
        ON CONFLICT (device_id) DO UPDATE SET location_request_at = now(), updated_at = now()
-       RETURNING location_request_at AS "locationRequestAt"`,
+       RETURNING location_request_at AS "locationRequestAt", fcm_token AS "fcmToken"`,
       [req.params.deviceId]
     );
+    if (!rows[0].fcmToken) return res.status(409).json({ error: 'Device has not registered for push notifications' });
+    await sendLocationRequest(rows[0].fcmToken, req.params.deviceId);
     res.status(202).json({ requestedAt: rows[0].locationRequestAt });
   } catch (err) {
     console.error('[POST location request ERROR]', err);

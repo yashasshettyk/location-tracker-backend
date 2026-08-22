@@ -42,10 +42,12 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS device_settings (
       device_id TEXT PRIMARY KEY,
       interval_minutes INTEGER NOT NULL DEFAULT 15,
+      fcm_token TEXT,
       location_request_at TIMESTAMPTZ,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await query(`ALTER TABLE device_settings ADD COLUMN IF NOT EXISTS fcm_token TEXT;`);
 
   schemaReady = true;
 }
