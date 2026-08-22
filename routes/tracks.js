@@ -76,7 +76,13 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ trackId, pointsStored: points.length });
   } catch (err) {
-    console.error(err);
+    console.error('[POST /api/tracks ERROR]', {
+      message: err.message,
+      code: err.code,
+      sqlState: err.sqlState,
+      hint: err.hint,
+      stack: err.stack
+    });
     res.status(500).json({ error: 'Failed to store track' });
   }
 });
