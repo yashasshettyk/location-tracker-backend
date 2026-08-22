@@ -51,7 +51,7 @@ async function getSql() {
     );
   }
   await ensureSchema();
-  return sql;
+  return { query };
 }
 
 module.exports = { getSql };
