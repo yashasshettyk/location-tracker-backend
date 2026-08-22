@@ -110,8 +110,8 @@ router.get('/:deviceId/settings', async (req, res) => {
 
 router.put('/:deviceId/settings', async (req, res) => {
   const intervalMinutes = Number(req.body?.intervalMinutes);
-  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 1440) {
-    return res.status(400).json({ error: 'intervalMinutes must be a whole number from 15 to 1440' });
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440) {
+    return res.status(400).json({ error: 'intervalMinutes must be a whole number from 1 to 1440' });
   }
   try {
     const sql = await getSql();

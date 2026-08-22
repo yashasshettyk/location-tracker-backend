@@ -57,7 +57,7 @@
     <form class="toolbar" id="searchForm">
       <label>Device ID<input id="deviceId" required placeholder="Enter device ID" autocomplete="off"></label>
       <label>API key<input id="apiKey" required type="password" placeholder="x-api-key" autocomplete="current-password"></label>
-      <label>Capture interval (minutes)<input id="intervalMinutes" type="number" min="15" max="1440" step="1" value="15" required></label>
+      <label>Capture interval (minutes)<input id="intervalMinutes" type="number" min="1" max="1440" step="1" value="15" required></label>
       <button type="submit">Load tracks</button><button id="saveSettings" type="button">Save interval</button><button id="requestLocation" type="button">Get current location</button>
     </form>
     <div id="status" class="status" role="status"></div>
