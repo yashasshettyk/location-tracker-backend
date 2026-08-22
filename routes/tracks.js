@@ -87,6 +87,84 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.get('/:deviceId/settings', async (req, res) => {
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `SELECT device_id AS "deviceId", interval_minutes AS "intervalMinutes",
+              location_request_at AS "locationRequestAt", updated_at AS "updatedAt"
+       FROM device_settings WHERE device_id = $1`,
+      [req.params.deviceId]
+    );
+    res.json(rows[0] || {
+      deviceId: req.params.deviceId,
+      intervalMinutes: 15,
+      locationRequestAt: null,
+      updatedAt: null
+    });
+  } catch (err) {
+    console.error('[GET settings ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch device settings' });
+  }
+});
+
+router.put('/:deviceId/settings', async (req, res) => {
+  const intervalMinutes = Number(req.body?.intervalMinutes);
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 1440) {
+    return res.status(400).json({ error: 'intervalMinutes must be a whole number from 15 to 1440' });
+  }
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `INSERT INTO device_settings (device_id, interval_minutes, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (device_id) DO UPDATE SET interval_minutes = EXCLUDED.interval_minutes,
+                                             updated_at = now()
+       RETURNING device_id AS "deviceId", interval_minutes AS "intervalMinutes",
+                 location_request_at AS "locationRequestAt", updated_at AS "updatedAt"`,
+      [req.params.deviceId, intervalMinutes]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[PUT settings ERROR]', err);
+    res.status(500).json({ error: 'Failed to save device settings' });
+  }
+});
+
+router.post('/:deviceId/location-request', async (req, res) => {
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `INSERT INTO device_settings (device_id, location_request_at, updated_at)
+       VALUES ($1, now(), now())
+       ON CONFLICT (device_id) DO UPDATE SET location_request_at = now(), updated_at = now()
+       RETURNING location_request_at AS "locationRequestAt"`,
+      [req.params.deviceId]
+    );
+    res.status(202).json({ requestedAt: rows[0].locationRequestAt });
+  } catch (err) {
+    console.error('[POST location request ERROR]', err);
+    res.status(500).json({ error: 'Failed to request current location' });
+  }
+});
+
+router.get('/:deviceId/latest', async (req, res) => {
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `SELECT p.lat, p.lon, p.accuracy, p.timestamp, t.date
+       FROM points p JOIN tracks t ON t.id = p.track_id
+       WHERE t.device_id = $1 ORDER BY p.timestamp DESC LIMIT 1`,
+      [req.params.deviceId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'No location received yet' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[GET latest location ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch latest location' });
+  }
+});
+
 /**
  * GET /api/tracks/:deviceId
  * Lists all days that have a stored track for this device.

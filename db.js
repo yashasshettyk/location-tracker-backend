@@ -38,6 +38,14 @@ async function ensureSchema() {
 
   await query(`CREATE INDEX IF NOT EXISTS idx_points_track_id ON points(track_id);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_tracks_device_date ON tracks(device_id, date);`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS device_settings (
+      device_id TEXT PRIMARY KEY,
+      interval_minutes INTEGER NOT NULL DEFAULT 15,
+      location_request_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 
   schemaReady = true;
 }
