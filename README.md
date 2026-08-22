@@ -25,6 +25,10 @@ built to deploy on Vercel with a Postgres database attached.
 Your API is now live at `https://<your-project>.vercel.app`. The database tables are
 created automatically the first time any endpoint runs — no separate migration step.
 
+The mobile admin console is available at `https://<your-project>.vercel.app/admin/`.
+Enter the device ID and the same API key configured in Vercel to view stored dates,
+route points, map markers, and location names.
+
 ## Local development
 
 ```bash
