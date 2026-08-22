@@ -193,7 +193,7 @@ router.get('/:deviceId', async (req, res) => {
   try {
     const sql = await getSql();
     const rows = await sql.query(
-      `SELECT date, created_at,
+      `SELECT date, created_at, to_char(created_at, 'YYYY-MM-DD FMHH12:MI AM') AS "createdAt12",
               (SELECT COUNT(*) FROM points WHERE points.track_id = tracks.id) AS "pointCount"
        FROM tracks WHERE device_id = $1 ORDER BY date DESC`,
       [req.params.deviceId]
@@ -214,7 +214,8 @@ router.get('/:deviceId/:date', async (req, res) => {
     const sql = await getSql();
 
     const trackRows = await sql.query(
-      `SELECT id, created_at FROM tracks WHERE device_id = $1 AND date = $2`,
+      `SELECT id, created_at, to_char(created_at, 'YYYY-MM-DD FMHH12:MI AM') AS "createdAt12"
+       FROM tracks WHERE device_id = $1 AND date = $2`,
       [req.params.deviceId, req.params.date]
     );
 
@@ -234,6 +235,7 @@ router.get('/:deviceId/:date', async (req, res) => {
         deviceId: req.params.deviceId,
         date: req.params.date,
         uploadedAt: track.created_at,
+        uploadedAt12: track.createdAt12,
         pointCount: points.length,
       },
       geometry: {
