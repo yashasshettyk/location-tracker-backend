@@ -13,6 +13,29 @@ router.use((req, res, next) => {
   next();
 });
 
+router.get('/devices', async (req, res) => {
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `SELECT devices.device_id AS "deviceId",
+              devices.last_seen AS "lastSeen",
+              COALESCE(settings.interval_minutes, 15) AS "intervalMinutes",
+              (SELECT COUNT(*) FROM tracks WHERE tracks.device_id = devices.device_id) AS "daysTracked"
+       FROM (
+         SELECT device_id, MAX(created_at) AS last_seen FROM tracks GROUP BY device_id
+         UNION
+         SELECT device_id, MAX(updated_at) AS last_seen FROM device_settings GROUP BY device_id
+       ) devices
+       LEFT JOIN device_settings settings ON settings.device_id = devices.device_id
+       ORDER BY devices.last_seen DESC NULLS LAST, devices.device_id ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[GET devices ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch devices' });
+  }
+});
+
 /**
  * POST /api/tracks
  * Body: {
