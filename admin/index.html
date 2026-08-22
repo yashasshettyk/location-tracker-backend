@@ -57,7 +57,7 @@
     <form class="toolbar" id="searchForm">
       <label>Device ID<input id="deviceId" required placeholder="Enter device ID" autocomplete="off"></label>
       <label>API key<input id="apiKey" required type="password" placeholder="x-api-key" autocomplete="current-password"></label>
-      <label>Capture interval<select id="intervalMinutes"><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="120">Every 2 hours</option><option value="360">Every 6 hours</option><option value="720">Every 12 hours</option><option value="1440">Once a day</option></select></label>
+      <label>Capture interval (minutes)<input id="intervalMinutes" type="number" min="15" max="1440" step="1" value="15" required></label>
       <button type="submit">Load tracks</button><button id="saveSettings" type="button">Save interval</button><button id="requestLocation" type="button">Get current location</button>
     </form>
     <div id="status" class="status" role="status"></div>
