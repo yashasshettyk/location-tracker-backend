@@ -8,13 +8,14 @@ const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 // sql is an HTTP-based query function - no persistent connection to open/close per
 // request, which fits serverless functions well (each invocation is short-lived).
 const sql = connectionString ? neon(connectionString) : null;
+const query = sql ? (text, params) => sql(text, params) : null;
 
 let schemaReady = false;
 
 async function ensureSchema() {
   if (schemaReady) return;
 
-  await sql.query(`
+  await query(`
     CREATE TABLE IF NOT EXISTS tracks (
       id SERIAL PRIMARY KEY,
       device_id TEXT NOT NULL,
@@ -24,7 +25,7 @@ async function ensureSchema() {
     );
   `);
 
-  await sql.query(`
+  await query(`
     CREATE TABLE IF NOT EXISTS points (
       id SERIAL PRIMARY KEY,
       track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
@@ -35,8 +36,8 @@ async function ensureSchema() {
     );
   `);
 
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_points_track_id ON points(track_id);`);
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_tracks_device_date ON tracks(device_id, date);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_points_track_id ON points(track_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tracks_device_date ON tracks(device_id, date);`);
 
   schemaReady = true;
 }
