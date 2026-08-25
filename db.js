@@ -38,6 +38,19 @@ async function ensureSchema() {
 
   await query(`CREATE INDEX IF NOT EXISTS idx_points_track_id ON points(track_id);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_tracks_device_date ON tracks(device_id, date);`);
+
+  // Enforce one row per (track, timestamp). This lets uploads MERGE into a day instead of
+  // replacing it wholesale, so a partial upload (a single on-demand fix, or the first upload
+  // right after a reinstall when the phone's local copy is sparse) can't wipe points the
+  // server already stored. Remove any pre-existing duplicates first so the index can be built.
+  await query(`
+    DELETE FROM points a USING points b
+    WHERE a.id > b.id AND a.track_id = b.track_id AND a.timestamp = b.timestamp;
+  `);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uniq_points_track_timestamp
+    ON points(track_id, timestamp);
+  `);
   await query(`
     CREATE TABLE IF NOT EXISTS device_settings (
       device_id TEXT PRIMARY KEY,

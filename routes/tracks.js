@@ -84,12 +84,18 @@ router.post('/', async (req, res) => {
     );
     const trackId = trackRows[0].id;
 
-    // Replace any previously-uploaded points for this day (handles retries cleanly)
-    await sql.query(`DELETE FROM points WHERE track_id = $1`, [trackId]);
+    // De-duplicate the incoming batch by timestamp: a single INSERT ... ON CONFLICT can't
+    // touch the same (track_id, timestamp) twice, and Postgres rejects it if it does.
+    const uniquePoints = Array.from(
+      new Map(points.map((p) => [p.timestamp, p])).values()
+    );
 
-    // Single bulk insert instead of one round-trip per point
+    // MERGE the points into the day instead of replacing it. The unique index on
+    // (track_id, timestamp) makes this idempotent: re-uploading an existing fix updates it
+    // in place, while new fixes are added. A partial upload therefore extends the day's
+    // history rather than wiping it.
     const values = [];
-    const placeholders = points
+    const placeholders = uniquePoints
       .map((p, i) => {
         const base = i * 5;
         values.push(trackId, p.lat, p.lon, p.accuracy ?? null, p.timestamp);
@@ -98,11 +104,13 @@ router.post('/', async (req, res) => {
       .join(', ');
 
     await sql.query(
-      `INSERT INTO points (track_id, lat, lon, accuracy, timestamp) VALUES ${placeholders}`,
+      `INSERT INTO points (track_id, lat, lon, accuracy, timestamp) VALUES ${placeholders}
+       ON CONFLICT (track_id, timestamp) DO UPDATE
+         SET lat = EXCLUDED.lat, lon = EXCLUDED.lon, accuracy = EXCLUDED.accuracy`,
       values
     );
 
-    res.status(201).json({ trackId, pointsStored: points.length });
+    res.status(201).json({ trackId, pointsStored: uniquePoints.length });
   } catch (err) {
     console.error('[POST /api/tracks ERROR]', {
       message: err.message,
@@ -274,6 +282,90 @@ router.get('/:deviceId/:date', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch track' });
+  }
+});
+
+/**
+ * DELETE /api/tracks/:deviceId/:date/points/:timestamp
+ * Deletes a single point (identified by its epoch-millis timestamp) from one day's track.
+ */
+router.delete('/:deviceId/:date/points/:timestamp', async (req, res) => {
+  const timestamp = Number(req.params.timestamp);
+  if (!Number.isFinite(timestamp)) {
+    return res.status(400).json({ error: 'timestamp must be a number (epoch millis)' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(req.params.date)) {
+    return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
+  }
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `DELETE FROM points
+       USING tracks
+       WHERE points.track_id = tracks.id
+         AND tracks.device_id = $1 AND tracks.date = $2
+         AND points.timestamp = $3
+       RETURNING points.id`,
+      [req.params.deviceId, req.params.date, timestamp]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'No point with that timestamp for this device/date' });
+    }
+    res.json({ deviceId: req.params.deviceId, date: req.params.date, timestamp, pointsDeleted: rows.length });
+  } catch (err) {
+    console.error('[DELETE point ERROR]', err);
+    res.status(500).json({ error: 'Failed to delete point' });
+  }
+});
+
+/**
+ * DELETE /api/tracks/:deviceId/:date
+ * Deletes one day's track for a device. Its points are removed automatically
+ * (points.track_id has ON DELETE CASCADE).
+ */
+router.delete('/:deviceId/:date', async (req, res) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(req.params.date)) {
+    return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
+  }
+  try {
+    const sql = await getSql();
+    const rows = await sql.query(
+      `DELETE FROM tracks WHERE device_id = $1 AND date = $2 RETURNING id`,
+      [req.params.deviceId, req.params.date]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'No track for that device/date' });
+    }
+    res.json({ deviceId: req.params.deviceId, date: req.params.date, deleted: true });
+  } catch (err) {
+    console.error('[DELETE track ERROR]', err);
+    res.status(500).json({ error: 'Failed to delete track' });
+  }
+});
+
+/**
+ * DELETE /api/tracks/:deviceId
+ * Removes a device completely: all of its tracks (points cascade) and its
+ * saved settings / notification token.
+ */
+router.delete('/:deviceId', async (req, res) => {
+  try {
+    const sql = await getSql();
+    const tracksDeleted = await sql.query(
+      `DELETE FROM tracks WHERE device_id = $1 RETURNING id`,
+      [req.params.deviceId]
+    );
+    const settingsDeleted = await sql.query(
+      `DELETE FROM device_settings WHERE device_id = $1 RETURNING device_id`,
+      [req.params.deviceId]
+    );
+    if (!tracksDeleted.length && !settingsDeleted.length) {
+      return res.status(404).json({ error: 'No such device' });
+    }
+    res.json({ deviceId: req.params.deviceId, tracksDeleted: tracksDeleted.length });
+  } catch (err) {
+    console.error('[DELETE device ERROR]', err);
+    res.status(500).json({ error: 'Failed to delete device' });
   }
 });
 
